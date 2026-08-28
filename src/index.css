@@ -64,3 +64,33 @@
     @apply tabular-nums;
   }
 }
+
+@layer utilities {
+  /* Severe Red Glow for High-Priority Alerts */
+  @keyframes light-glow-red {
+    0%, 100% {
+      text-shadow: 0 0 6px rgba(220, 38, 38, 0.4), 0 0 12px rgba(239, 68, 68, 0.25);
+    }
+    50% {
+      text-shadow: 0 0 14px rgba(220, 38, 38, 0.8), 0 0 24px rgba(239, 68, 68, 0.5);
+    }
+  }
+
+  /* Live Teal Glow for Active Atmospheric Telemetry */
+  @keyframes light-glow-teal {
+    0%, 100% {
+      text-shadow: 0 0 6px rgba(13, 148, 136, 0.4), 0 0 12px rgba(20, 184, 166, 0.25);
+    }
+    50% {
+      text-shadow: 0 0 14px rgba(13, 148, 136, 0.8), 0 0 24px rgba(20, 184, 166, 0.5);
+    }
+  }
+
+  .animate-glow-red {
+    animation: light-glow-red 2s infinite ease-in-out;
+  }
+
+  .animate-glow-teal {
+    animation: light-glow-teal 2.5s infinite ease-in-out;
+  }
+}

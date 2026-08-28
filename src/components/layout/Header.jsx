@@ -2,7 +2,13 @@ import { Bell, Settings } from 'lucide-react';
 
 export default function Header({ activeAlertCount = 0 }) {
   return (
-    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6">
+    <header className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200 bg-white px-6 relative"
+            style={{
+              backgroundColor: 'rgba(255, 255, 255, 0.9)',
+              backgroundImage: 'radial-gradient(rgba(14, 165, 233, 0.2) 1.5px, transparent 1.5px)',
+              backgroundSize: '20px 20px'
+            }}
+    >
       <div className="flex items-center gap-4">
         <input
           type="text"
@@ -18,9 +24,12 @@ export default function Header({ activeAlertCount = 0 }) {
         >
           <Bell className="h-5 w-5" />
           {activeAlertCount > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
-              {activeAlertCount}
-            </span>
+             <>
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 rounded-full bg-red-400 opacity-75 animate-ping"></span>
+                <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold text-white">
+                  {activeAlertCount}
+                </span>
+             </>
           )}
         </button>
         <button
