@@ -2,7 +2,7 @@ import { mockAlerts } from './mockAlerts';
 
 // Bounding box roughly covering mainland India
 const INDIA_BOUNDS = { latMin: 6, latMax: 38, lngMin: 68, lngMax: 98 };
-const GRID_RESOLUTION_DEG = 1; // ~32 x 30 grid, light enough for Deck.gl HeatmapLayer
+const GRID_RESOLUTION_DEG = 0.5; // ~32 x 30 grid, light enough for Deck.gl HeatmapLayer
 
 // Deterministic pseudo-noise (no Math.random — keeps demo output stable across reloads)
 function seededNoise(lat, lng) {
@@ -62,7 +62,7 @@ function computeHazardGrid(hazardType) {
       value += gaussianContribution(dist, h.intensity, h.sigmaKm);
     }
     // ambient embient baseline + tiny deterministic texture so flat zero-zones aren't perfectly uniform
-    const ambient = 2 + seededNoise(lat, lng) * 4;
+    const ambient = seededNoise(lat, lng) * 1.5;
     const total = Math.min(100, value + ambient);
 
     return { lat, lng, value: Math.round(total * 10) / 10 };

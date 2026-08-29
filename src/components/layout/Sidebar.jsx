@@ -9,6 +9,7 @@ import {
   Settings,
   HelpCircle,
 } from 'lucide-react';
+import logo from "../../assets/IndraAI-Logo.png"
 
 const navItems = [
   { to: '/live-map', label: 'Live Map', icon: Map },
@@ -28,10 +29,14 @@ export default function Sidebar() {
               backgroundSize: '20px 20px'
             }}
     >
-      <div className="border-b border-slate-200 px-5 py-5">
-        <h1 className="text-4xl font-extrabold bg-linear-to-r from-teal-600 via-cyan-500 to-sky-600 bg-clip-text text-transparent tracking-wide drop-shadow-[0_0_8px_rgba(20,184,166,0.7)] drop-shadow-[0_0_16px_rgba(6,182,212,0.5)] animate-pulse">
-          IndraAI
-        </h1>
+      <div className="flex items-center gap-3">
+        <a href="/" className="flex items-center transition-opacity hover:opacity-90">
+          <img
+            src={logo}
+            alt="IndraAI Logo"
+            className="h-35 w-auto object-contain"
+          />
+        </a>
       </div>
 
       <nav className="flex-1 space-y-1.5 overflow-y-auto px-3 py-4">

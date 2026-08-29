@@ -1,125 +1,125 @@
-// // Precomputed 2D grid: risk score as a function of ΔT (-5 to +5 °C) and ΔP (-50% to +50%)
-// // useSimulatorGrid.js will linearly interpolate between these nodes client-side.
-// const deltaTSteps = [-5, -2.5, 0, 2.5, 5];
-// const deltaPSteps = [-50, -25, 0, 25, 50];
+import { mockTelemetry } from './mockTelemetry';
 
-// function computeRisk(baseRisk, dT, dP) {
-//   const tFactor = dT * 4.5;   // warmer air holds more moisture → higher risk
-//   const pFactor = dP * 0.6;   // more precipitation → higher risk
-//   const score = baseRisk + tFactor + pFactor;
-//   return Math.min(100, Math.max(0, Math.round(score)));
-// }
-
-// function buildGrid(baseRisk) {
-//   const grid = [];
-//   for (const dT of deltaTSteps) {
-//     for (const dP of deltaPSteps) {
-//       grid.push({ deltaT: dT, deltaP: dP, riskScore: computeRisk(baseRisk, dT, dP) });
-//     }
-//   }
-//   return grid;
-// }
-
-// export const mockSimulator = {
-//   deltaTRange: { min: -5, max: 5, step: 0.5 },
-//   deltaPRange: { min: -50, max: 50, step: 5 },
-
-//   // Keyed by regionId — each region has its own base risk + precomputed grid
-//   grids: {
-//     'IN-MH-MUM': { baseRisk: 60, grid: buildGrid(60) },
-//     'IN-HP-SOL': { baseRisk: 50, grid: buildGrid(50) },
-//     'IN-HP-SHM': { baseRisk: 45, grid: buildGrid(45) },
-//     'IN-UK-RUD': { baseRisk: 42, grid: buildGrid(42) },
-//     'IN-AS-GUW': { baseRisk: 35, grid: buildGrid(35) },
-//     'IN-WB-DAR': { baseRisk: 38, grid: buildGrid(38) },
-//     'IN-TN-CHE': { baseRisk: 15, grid: buildGrid(15) },
-//     'IN-MH-PUN': { baseRisk: 10, grid: buildGrid(10) },
-//   },
-// };
-
-const deltaTSteps = [-5, -2.5, 0, 2.5, 5];
-const deltaPSteps = [-50, -25, 0, 25, 50];
+// Grid steps are deltas FROM each region's current baseline (pulled from
+// mockTelemetry.current), not absolute values — this keeps the grid generic
+// while the UI/hook layer converts to/from absolute km/h and mm/h.
+const deltaWindSteps = [-30, -15, 0, 15, 30];   // km/h change from baseline
+const deltaPrecipSteps = [-40, -20, 0, 20, 40]; // mm/h change from baseline
 
 // Per-region physical sensitivity profile.
-// tSensitivity: how strongly warming increases risk (moisture-holding capacity effect)
-// pSensitivity: how strongly precipitation increases risk — elevated for
-// mountainous/orographic-lift-prone regions (Solan, Shimla, Rudraprayag, Darjeeling)
-// vs. flatter coastal/plains regions (Mumbai, Chennai, Guwahati, Pune).
+// windSensitivity: risk points per km/h of wind speed change — higher for
+// plains/coastal regions where convective/thunderstorm risk is wind-driven.
+// precipSensitivity: risk points per mm/h of rainfall change — higher for
+// Himalayan/hill regions where orographic lift amplifies flash flood risk.
 const regionSensitivity = {
-  'IN-MH-MUM': { tSensitivity: 4.5, pSensitivity: 0.65, baseRisk: 60 }, // coastal, flood-prone via drainage not terrain
-  'IN-HP-SOL': { tSensitivity: 4.0, pSensitivity: 1.15, baseRisk: 50 }, // mountainous — high orographic sensitivity
-  'IN-HP-SHM': { tSensitivity: 3.8, pSensitivity: 1.1, baseRisk: 45 },  // mountainous
-  'IN-UK-RUD': { tSensitivity: 3.9, pSensitivity: 1.2, baseRisk: 42 }, // steep Himalayan terrain — highest pSensitivity
-  'IN-AS-GUW': { tSensitivity: 4.8, pSensitivity: 0.55, baseRisk: 35 }, // plains, thunderstorm-driven (CAPE-sensitive not terrain)
-  'IN-WB-DAR': { tSensitivity: 3.7, pSensitivity: 1.05, baseRisk: 38 }, // hill station, steep slope
-  'IN-TN-CHE': { tSensitivity: 4.2, pSensitivity: 0.5, baseRisk: 15 },  // flat coastal plain — low orographic effect
-  'IN-MH-PUN': { tSensitivity: 4.3, pSensitivity: 0.5, baseRisk: 10 }, // flat plateau, low terrain sensitivity
+  'IN-MH-MUM': { windSensitivity: 0.6, precipSensitivity: 0.5 },
+  'IN-HP-SOL': { windSensitivity: 0.3, precipSensitivity: 0.7 },
+  'IN-HP-SHM': { windSensitivity: 0.3, precipSensitivity: 0.65 },
+  'IN-UK-RUD': { windSensitivity: 0.3, precipSensitivity: 0.75 },
+  'IN-AS-GUW': { windSensitivity: 0.9, precipSensitivity: 0.4 },
+  'IN-WB-DAR': { windSensitivity: 0.35, precipSensitivity: 0.68 },
+  'IN-TN-CHE': { windSensitivity: 0.5, precipSensitivity: 0.45 },
+  'IN-MH-PUN': { windSensitivity: 0.5, precipSensitivity: 0.35 },
 };
 
-function computeRisk(baseRisk, dT, dP, tSensitivity, pSensitivity) {
-  const tFactor = dT * tSensitivity;
-  const pFactor = dP * pSensitivity;
-  const score = baseRisk + tFactor + pFactor;
+// Base risk per region — reuses each region's live risk score as the
+// "current model output" the simulator perturbs away from.
+const regionBaseRisk = {
+  'IN-MH-MUM': 94,
+  'IN-HP-SOL': 85,
+  'IN-HP-SHM': 82,
+  'IN-UK-RUD': 84,
+  'IN-AS-GUW': 65,
+  'IN-WB-DAR': 78,
+  'IN-TN-CHE': 22,
+  'IN-MH-PUN': 45,
+};
+
+function computeRisk(baseRisk, deltaWind, deltaPrecip, windSensitivity, precipSensitivity) {
+  const score = baseRisk + deltaWind * windSensitivity + deltaPrecip * precipSensitivity;
   return Math.min(100, Math.max(0, Math.round(score)));
 }
 
-function buildGrid({ baseRisk, tSensitivity, pSensitivity }) {
+function buildGrid(regionId) {
+  const { windSensitivity, precipSensitivity } = regionSensitivity[regionId];
+  const baseRisk = regionBaseRisk[regionId];
+
   const grid = [];
-  for (const dT of deltaTSteps) {
-    for (const dP of deltaPSteps) {
+  for (const deltaWind of deltaWindSteps) {
+    for (const deltaPrecip of deltaPrecipSteps) {
       grid.push({
-        deltaT: dT,
-        deltaP: dP,
-        riskScore: computeRisk(baseRisk, dT, dP, tSensitivity, pSensitivity),
+        deltaWind,
+        deltaPrecip,
+        riskScore: computeRisk(baseRisk, deltaWind, deltaPrecip, windSensitivity, precipSensitivity),
       });
     }
   }
   return grid;
 }
 
-export const mockSimulator = {
-  deltaTRange: { min: -5, max: 5, step: 0.5 },
-  deltaPRange: { min: -50, max: 50, step: 5 },
-  deltaTSteps,
-  deltaPSteps,
+// Baseline absolute values per region, sourced directly from mockTelemetry
+// so the Simulator's starting point matches what Live Map already shows.
+function getBaseline(regionId) {
+  const telemetry = mockTelemetry[regionId]?.current;
+  return {
+    windSpeed: telemetry?.windGust ?? 30,
+    precipRate: telemetry?.rainfallRate ?? 40,
+  };
+}
 
-  grids: Object.fromEntries(
-    Object.entries(regionSensitivity).map(([regionId, profile]) => [
+export const mockSimulator = {
+  deltaWindSteps,
+  deltaPrecipSteps,
+
+  // Absolute slider bounds shown in the UI — generous enough to cover
+  // realistic extremes above/below any region's baseline.
+  windSpeedRange: { min: 0, max: 150, step: 5 },
+  precipRange: { min: 0, max: 200, step: 5 },
+
+  // Keyed by regionId — each region has its own baseline, sensitivity
+  // profile, and precomputed 5x5 (wind x precip) risk grid.
+  regions: Object.fromEntries(
+    Object.keys(regionSensitivity).map((regionId) => [
       regionId,
-      { ...profile, grid: buildGrid(profile) },
+      {
+        baseRisk: regionBaseRisk[regionId],
+        ...regionSensitivity[regionId],
+        baseline: getBaseline(regionId),
+        grid: buildGrid(regionId),
+      },
     ])
   ),
 
-  // Quick-select named scenarios — applied as a fixed (deltaT, deltaP) pair
-  // that overrides slider position when selected.
+  // Quick-select scenarios — expressed as absolute deltas applied on top
+  // of whatever region is currently selected.
   presets: [
     {
-      id: 'rcp85-extreme',
-      label: 'RCP 8.5 — Extreme Warming',
-      description: 'High-emissions warming pathway: strong temperature rise with moderate precipitation increase.',
-      deltaT: 4.5,
-      deltaP: 20,
+      id: 'severe-storm',
+      label: 'Severe Storm Surge',
+      description: 'Sharp increase in both wind speed and rainfall intensity — worst-case convective event.',
+      deltaWind: 30,
+      deltaPrecip: 40,
     },
     {
-      id: 'monsoon-burst',
-      label: 'Monsoon Burst',
-      description: 'Sudden intense precipitation surge with modest warming — simulates a cloudburst-triggering event.',
-      deltaT: 1.5,
-      deltaP: 45,
+      id: 'cloudburst-spike',
+      label: 'Cloudburst Spike',
+      description: 'Rainfall intensity surges with only modest wind change — typical cloudburst signature.',
+      deltaWind: 5,
+      deltaPrecip: 40,
     },
     {
-      id: 'dry-lull',
-      label: 'Dry Lull',
-      description: 'Below-average precipitation with slight warming — a suppressed-risk baseline scenario.',
-      deltaT: 1.0,
-      deltaP: -35,
+      id: 'high-wind-dry',
+      label: 'High Wind, Low Rain',
+      description: 'Strong gusty winds with little precipitation — dry thunderstorm / squall-line pattern.',
+      deltaWind: 30,
+      deltaPrecip: -20,
     },
     {
-      id: 'baseline',
-      label: 'Current Baseline',
-      description: 'No deviation from present-day observed conditions.',
-      deltaT: 0,
-      deltaP: 0,
+      id: 'calm-baseline',
+      label: 'Calm Conditions',
+      description: 'Reduced wind and rainfall — a subsiding, lower-risk scenario.',
+      deltaWind: -20,
+      deltaPrecip: -30,
     },
   ],
 };
